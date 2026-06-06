@@ -8,7 +8,15 @@ const app = express();
 
 // Middleware
 app.use(express.json()); 
-app.use(cors()); 
+
+// --- FIXED: Updated CORS to allow your Vercel Frontend ---
+app.use(cors({
+    origin: [
+        "http://localhost:5173", 
+        "https://coffee-app-frontend-dw23.vercel.app"
+    ],
+    credentials: true
+}));
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
@@ -71,24 +79,25 @@ app.post('/api/login', async (req, res) => {
 // ==========================================
 // --- ORDER APIs ---
 // ==========================================
-app.post('/api/orders', async (req, res) => {
+app.get('/api/orders/:userId', async (req, res) => {
     try {
-        const { userId, items, total, address, paymentMethod } = req.body;
-        const count = await Order.countDocuments();
-        const orderId = `#ORD-${String(count + 1).padStart(4, '0')}`;
-
-        const newOrder = new Order({ orderId, userId, items, total, address, paymentMethod });
-        await newOrder.save();
-        res.status(201).json(newOrder);
+        const orders = await Order.find({ userId: req.params.userId }).sort({ date: -1 });
+        res.json(orders);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/orders/:userId', async (req, res) => {
+// --- FIXED: Removed the duplicate order route and kept the one with estimatedDelivery ---
+app.post('/api/orders', async (req, res) => {
     try {
-        const orders = await Order.find({ userId: req.params.userId }).sort({ date: -1 });
-        res.json(orders);
+        const { userId, items, total, address, paymentMethod, estimatedDelivery } = req.body;
+        const count = await Order.countDocuments();
+        const orderId = `#ORD-${String(count + 1).padStart(4, '0')}`;
+
+        const newOrder = new Order({ orderId, userId, items, total, address, paymentMethod, estimatedDelivery });
+        await newOrder.save();
+        res.status(201).json(newOrder);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -111,22 +120,6 @@ app.put('/api/admin/orders/:id', async (req, res) => {
         const { status } = req.body;
         const updatedOrder = await Order.findByIdAndUpdate(req.params.id, { status: status }, { new: true });
         res.json(updatedOrder);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/orders', async (req, res) => {
-    try {
-        // ADD estimatedDelivery here vvvvvv
-        const { userId, items, total, address, paymentMethod, estimatedDelivery } = req.body;
-        const count = await Order.countDocuments();
-        const orderId = `#ORD-${String(count + 1).padStart(4, '0')}`;
-
-        // ADD estimatedDelivery here vvvvvv
-        const newOrder = new Order({ orderId, userId, items, total, address, paymentMethod, estimatedDelivery });
-        await newOrder.save();
-        res.status(201).json(newOrder);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
